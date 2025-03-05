@@ -9,7 +9,12 @@
 main proc
     MOV AX, @data  ; Завантаження сегменту даних
     MOV DS, AX
-
+    ; IF ((a > b) && (b < c)) THEN
+    ;     IF (a > 100) 
+    ;         b = b + 10
+    ; ELSE
+    ;     a = 200
+    ;     b = 100
     ; Перевірка умови (a > b)
     MOV AX, a
     CMP AX, b
@@ -20,7 +25,7 @@ main proc
     CMP BX, c
     JGE else   ; Якщо b >= c, перейти в else
 
-    ; if умова виконується, тепер перевіримо (a > 100)
+    ; умова виконується, тепер перевіримо (a > 100)
     CMP AX, 100
     JLE end_if      ; Якщо a <= 100, не виконуємо b = b + 10
 
