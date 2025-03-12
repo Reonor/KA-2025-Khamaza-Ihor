@@ -1,21 +1,21 @@
 .model small
 .stack 100h
+
 .data
-    a dw 1  
-    b dw 10
+    num1 dw 5
+    num2 dw 10
+
 .code
-main    proc
+main:
     mov ax, @data
-    mov ds,ax
-    mov ax, a
-    mov bx, b
-    and ax,bx
-    cmp ax,bx
-    jne a_is_zero
-    mov ax, 1
+    mov ds, ax
+
+    mov ax, num1
+    mov bx, num2
+
+    mul bx            ; AX = AX * BX, результат у AX
+
+    mov ah, 4Ch
     int 21h
-    a_is_zero:
-    mov ax,0
-    int 21h
-main    endp
+
 end main
