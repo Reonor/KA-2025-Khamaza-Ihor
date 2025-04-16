@@ -307,7 +307,29 @@ sum_loop:
     mov cx, [count]              ; Divisor (count)
     idiv cx                      ; AX = quotient (average)
 
-    ; Print the result
+    ; After division (AX = quotient, DX = remainder)
+    mov bx, cx          ; BX = count
+    sar bx, 1           ; BX = count/2 (signed)
+    
+    ; Check if quotient is negative
+    test ax, ax
+    jns positive_quotient
+
+    negative_quotient:
+        ; For negative quotients, check if |remainder| > count/2
+        neg dx              ; Make remainder positive
+        cmp dx, bx
+        jle print_average_result
+        dec ax              ; Round down (more negative)
+        jmp print_average_result
+
+    positive_quotient:
+         ; For positive quotients, check if remainder >= count/2
+        cmp dx, bx
+        jl print_average_result
+        inc ax              ; Round up
+
+print_average_result:
     call print_number
     ret
 
