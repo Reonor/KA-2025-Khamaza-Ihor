@@ -217,7 +217,7 @@ done_sort:
 bubble_sort endp
 
 ; ========================================================
-; PRINT MEDIAN (Handles rounding for even counts)
+; PRINT MEDIAN (Fixed 32-bit addition)
 ; ========================================================
 print_median proc
     mov dx, offset msg_median
@@ -238,24 +238,43 @@ print_median proc
     jmp print_median_val
 
 even_count:
-    ; Even count: average of two middle elements (with rounding)
+    ; Even count: average of two middle elements (32-bit sum)
     dec ax
     shl ax, 1
     mov si, ax
+
+    ; Load first number into dx:ax (32-bit)
     mov ax, [number_array + si]
-    add ax, [number_array + si + 2]
-    cwd             ; Sign extend to dx:ax
-    mov cx, 2
-    idiv cx         ; ax = quotient, dx = remainder
+    cwd
+    push dx
+    push ax
+
+    ; Load second number into bx:cx (32-bit)
+    mov ax, [number_array + si + 2]
+    cwd
+    mov bx, dx
+    mov cx, ax
+
+    ; Pop first number into dx:ax (32-bit)
+    pop ax
+    pop dx
+
+    ; Add the two 32-bit numbers: dx:ax + bx:cx
+    add ax, cx      ; Add low words
+    adc dx, bx      ; Add high words with carry
+
+    ; Divide by 2 (32-bit division)
+    mov bx, 2
+    idiv bx         ; dx:ax / bx → ax=quotient, dx=remainder
 
     cmp dx, 0
-    je print_median_val  ; Exact, no adjustment
+    je print_median_val
     test dx, dx
     js negative_remainder
-    inc ax          ; Positive remainder (round up)
+    inc ax          ; Round up
     jmp print_median_val
 negative_remainder:
-    dec ax          ; Negative remainder (round down)
+    dec ax          ; Round down
 
 print_median_val:
     call print_number
@@ -268,7 +287,7 @@ no_numbers:
 print_median endp
 
 ; ========================================================
-; PRINT AVERAGE (Handles no input)
+; PRINT AVERAGE (Fixed 32-bit sum and rounding)
 ; ========================================================
 print_average proc
     mov dx, offset msg_avg
@@ -277,37 +296,46 @@ print_average proc
     mov cx, [count]
     jcxz no_numbers_avg
 
-    ; Initialize 32-bit sum (DI:SI)
-    xor si, si        ; Low word
-    xor di, di        ; High word
+    ; Reset 32-bit sum
+    mov sum_low, 0
+    mov sum_high, 0
 
     mov bx, 0         ; Index for number_array
 
 sum_loop:
-    mov ax, [number_array + bx]  ; Load 16-bit number
-    cwd                          ; Sign extend to DX:AX (32-bit)
-    add si, ax                   ; Add low word to SI
-    adc di, dx                   ; Add high word with carry to DI
+    mov ax, [number_array + bx]
+    cwd               ; Sign extend to dx:ax
+    add sum_low, ax
+    adc sum_high, dx  ; Add with carry
     add bx, 2
     loop sum_loop
 
-    ; Add count/2 for rounding (32-bit)
+    ; Check if sum is negative to adjust rounding
+    mov ax, sum_high
+    test ax, ax
+    jns sum_positive_avg
+    ; Subtract count/2 for negative sum
     mov ax, [count]
-    cwd                          ; Sign extend count to DX:AX
-    mov bx, ax
-    sar bx, 1                    ; BX = count/2 (signed)
-    mov ax, bx
-    cwd                          ; Sign extend BX to DX:AX
-    add si, ax                   ; Add low word of count/2
-    adc di, dx                   ; Add high word with carry
+    sar ax, 1
+    cwd
+    sub sum_low, ax
+    sbb sum_high, dx
+    jmp proceed_division
+sum_positive_avg:
+    ; Add count/2 for positive sum
+    mov ax, [count]
+    sar ax, 1
+    cwd
+    add sum_low, ax
+    adc sum_high, dx
 
-    ; Prepare for 32-bit division (DX:AX = DI:SI)
-    mov ax, si
-    mov dx, di
-    mov cx, [count]              ; Divisor (count)
-    idiv cx                      ; AX = quotient (average)
+proceed_division:
+    ; Load 32-bit sum into dx:ax
+    mov ax, sum_low
+    mov dx, sum_high
+    mov cx, [count]
+    idiv cx           ; dx:ax / cx → ax=quotient
 
-    ; Print the result
     call print_number
     ret
 
@@ -317,11 +345,11 @@ no_numbers_avg:
     ret
 print_average endp
 
+
 ; ========================================================
 ; PRINT NUMBER (Handles -32768 correctly)
 ; ========================================================
 print_number proc
-    ; Save all registers manually (replaces PUSHA)
     push di
     push si
     push bp
@@ -365,7 +393,6 @@ print_digits:
     int 21h
     loop print_digits
 
-    ; Restore registers manually (replaces POPA)
     pop ax
     pop cx
     pop dx
@@ -379,7 +406,6 @@ special_case:
     mov dx, offset minus_32768
     mov ah, 09h
     int 21h
-    ; Restore registers
     pop ax
     pop cx
     pop dx
